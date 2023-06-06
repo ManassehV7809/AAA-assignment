@@ -1,31 +1,52 @@
 import matplotlib.pyplot as plt
+import numpy as np
 import random
+import time
 from collections import defaultdict
 from sortedcontainers import SortedList
 
-def lineSweepSolveVertAdjacencies(rectangles):
-    events = SortedList()
+
+class Rectangle:
+    def __init__(self, x1, y1, x2, y2):
+        self.x1 = x1
+        self.y1 = y1
+        self.x2 = x2
+        self.y2 = y2
+
+    def intersects(self, other):
+        return not (self.x2 <= other.x1 or other.x2 <= self.x1 or self.y2 <= other.y1 or other.y2 <= self.y1)
+
+    def __lt__(self, other):
+        return self.x1 < other.x1
+
+
+def lineSweepSolveHorizAdjacencies(rectangles):
+    events = []
     adjacency_list = defaultdict(list)
 
     # Create events
     for rect in rectangles:
-        events.add((rect[0], 'left', rect))
-        events.add((rect[2], 'right', rect))
+        events.append((rect.y1, 'bottom', rect))
+        events.append((rect.y2, 'top', rect))
 
     active_rectangles = set()
 
     # Process events
+    events.sort()  # Sort events by y-coordinate
+
     for event in events:
-        x, event_type, rect = event
+        y, event_type, rect = event
 
-        if event_type == 'left':
-            for adj_rect in active_rectangles:
-                if adj_rect[3] > rect[1] and adj_rect[1] < rect[3]:
-                    adjacency_list[rect].append(adj_rect)
-
+        if event_type == 'bottom':
             active_rectangles.add(rect)
 
-        elif event_type == 'right':
+            # Check for horizontal adjacency with active rectangles
+            for adj_rect in active_rectangles:
+                if rect.y2 == adj_rect.y1:  # Check if the top edge of rect matches the bottom edge of adj_rect
+                    adjacency_list[rect].append(adj_rect)
+                    adjacency_list[adj_rect].append(rect)
+
+        else:
             active_rectangles.remove(rect)
 
     # Construct adjacency information
@@ -35,7 +56,7 @@ def lineSweepSolveVertAdjacencies(rectangles):
         adj_rects = adjacency_list[rect]
         adj_info += f"{len(adj_rects)}, "
         for adj_rect in adj_rects:
-            adj_info += f"{rectangles.index(adj_rect) + 1}, {adj_rect[0]}, {adj_rect[1]}, {adj_rect[2]}, {adj_rect[3]}, "
+            adj_info += f"{rectangles.index(adj_rect) + 1}, "
         rectanglesadjs.append(adj_info)
 
     return rectanglesadjs
@@ -50,30 +71,23 @@ def generate_rectangles(num_rectangles, x_range, y_range):
             max_width = x_range[1] - x1
             max_height = y_range[1] - y1
             if max_width < 1 or max_height < 1:
-                continue
+                continue  # Skip generating rectangle if range is too small
             width = random.randint(1, max_width)
             height = random.randint(1, max_height)
             x2 = x1 + width
             y2 = y1 + height
-            new_rect = (x1, y1, x2, y2)
-            if not any(rect_intersects(new_rect, rect) for rect in rectangles):
+            new_rect = Rectangle(x1, y1, x2, y2)
+            if not any(rect.intersects(new_rect) for rect in rectangles):
                 rectangles.append(new_rect)
                 break
-
-    # Sort rectangles based on x-coordinate
-    rectangles.sort(key=lambda rect: rect[0])
     return rectangles
-
-
-def rect_intersects(rect1, rect2):
-    return not (rect1[2] <= rect2[0] or rect2[2] <= rect1[0] or rect1[3] <= rect2[1] or rect2[3] <= rect1[1])
 
 
 def plot_rectangles(rectangles):
     fig, ax = plt.subplots()
     for rect in rectangles:
-        x = [rect[0], rect[2], rect[2], rect[0], rect[0]]
-        y = [rect[1], rect[1], rect[3], rect[3], rect[1]]
+        x = [rect.x1, rect.x2, rect.x2, rect.x1, rect.x1]
+        y = [rect.y1, rect.y1, rect.y2, rect.y2, rect.y1]
         ax.plot(x, y, 'b-')
     ax.set_xlabel('X')
     ax.set_ylabel('Y')
@@ -87,15 +101,18 @@ def main():
     y_range = (0, 15)
 
     rectangles = generate_rectangles(num_rectangles, x_range, y_range)
-    print(rectangles)
     plot_rectangles(rectangles)
 
-    # Solve vertical adjacencies using line sweep algorithm
-    line_sweep_results = lineSweepSolveVertAdjacencies(rectangles)
+    # Solve horizontal adjacencies using line sweep algorithm
+    start_time = time.time()
+    line_sweep_results = lineSweepSolveHorizAdjacencies(rectangles)
+    line_sweep_time = time.time() - start_time
 
     print("Line Sweep Results:")
     for result in line_sweep_results:
         print(result)
+
+    print("Line Sweep Execution Time:", line_sweep_time)
 
 
 if __name__ == "__main__":

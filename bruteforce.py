@@ -1,133 +1,107 @@
 import matplotlib.pyplot as plt
 import numpy as np
 import random
-import time
+from collections import defaultdict
+from sortedcontainers import SortedList
 
-#Algorithm implementation
-def bruteForceSolveVertAdjacencies(myList):
-    # An empty list that will hold the rectangle information of the rectangles adjacent to the one being considered
+
+
+
+
+def lineSweepSolveVertAdjacencies(rectangles):
+    events = SortedList()
+    adjacency_list = defaultdict(list)
+
+    # Create events
+    for rect in rectangles:
+        events.add((rect.x2, 'right', rect))  # Change x1 to x2 for 'right' events
+
+    active_rectangles = set()
+    y_coords = set()
+   
+    # Process events
+    for event in events:
+        x, event_type, rect = event
+
+        if event_type == 'right':  # Modify the condition for 'right' events
+            active_rectangles.add(rect)
+            y_coords.add(rect.y1)
+            y_coords.add(rect.y2)
+
+            # Check for vertical adjacency with active rectangles on the left
+            for y_coord in y_coords:
+                adj_rects = [
+                    adj_rect
+                    for adj_rect in active_rectangles
+                    if adj_rect.x2 <= rect.x1 and adj_rect.y1 <= rect.y2 and adj_rect.y2 >= rect.y1
+                ]
+                adjacency_list[rect].extend(adj_rects)
+                adjacency_list.update({adj_rect: [rect] for adj_rect in adj_rects})
+
+            active_rectangles.remove(rect)  # Remove the rectangle from active_rectangles
+
+    # Construct adjacency information
     rectanglesadjs = []
+    for rect in rectangles:
+        adj_info = f"{rectangles.index(rect) + 1}, "
+        adj_rects = adjacency_list[rect]
+        adj_info += f"{len(adj_rects)}, "
+        for adj_rect in adj_rects:
+            adj_info += f"{rectangles.index(adj_rect) + 1}, {adj_rect.x1}, {adj_rect.y1}, {adj_rect.x2}, {adj_rect.y2}, "
+        rectanglesadjs.append(adj_info)
 
-    # We iterate through the list to consider each rectangle once
-    for i, rect in enumerate(myList):
-        adjs = []
-        # A sublist is created to store the information of any rectangle that would be found to be adjacent to the rectangle on the ith position in the list 'rectangles'
-        for j, adj_rect in enumerate(myList):
-            # We iterate through the list to consider each rectangle in the list to try and compare it to the rectangle in the ith position 
-            if i == j:
-                continue
-
-            if rect[2] == adj_rect[0]: # this is done to check if the right-hand side x value of the rectangle being considered in the outer loop is the same as the left-hand side x coordinate of the rectangle in the inner loop
-                adjs.append(adj_rect) # if the above is evaluated to 'true', that rectangle is added on the adjacencies list in the ith position to indicate that it is adjacent to the rectangle in the ith position in the list 'rectangle'
-        rectangle_info = f"{i+1}, {len(adjs)}" # concatenate rectangle number with adjacent rectangle count
-        for adj_rect in adjs:
-            rectangle_info += f", {adj_rect[0]}, {adj_rect[1]}, {adj_rect[2]}"
-        rectanglesadjs.append(rectangle_info)
     return rectanglesadjs
 
-#Everything below is used for generation of rectangles that will be used by the algorithm
 
-#Define outer rectangle
-xb = 1
-yb = 1
-xt = 20000
-yt = 20000
-
-x = np.array([xb,xt,xt,xb,xb])
-y = np.array([yb,yb,yt,yt,yb])
-
-
-rect = []
-
-rect.append([xb,yb,xt,yt])
-
-
-
-
-# Split the first 4 rectangles into 4 rectangles each
-for k in range(5):
-  
-    new = rect.pop(0)
-
-    xb = new[0]
-    yb = new[1]
-    xt = new[2]
-    yt = new[3]
-
-    if ((xt-xb) > 1000) and ((yt -yb) > 1000):
-       
-
-        midx = int((xt - xb)/2) + xb
-        midy = int((yt - yb)/2) + yb
-        rx = random.randint(midx-400,midx+400)
-        ry = random.randint(midy-400,midy+400)
-
- 
-
-        rect.append([xb,yb,rx,ry])
-        rect.append([xb,ry,rx,yt])
-        rect.append([rx,yb,xt,ry])
-        rect.append([rx,ry,xt,yt])
+def generate_rectangles(num_rectangles, x_range, y_range):
+    rectangles = []
+    for _ in range(num_rectangles):
+        while True:
+            x1 = random.randint(x_range[0], x_range[1] - 1)
+            y1 = random.randint(y_range[0], y_range[1] - 1)
+            max_width = x_range[1] - x1
+            max_height = y_range[1] - y1
+            if max_width < 1 or max_height < 1:
+                continue  # Skip generating rectangle if range is too small
+            width = random.randint(1, max_width)
+            height = random.randint(1, max_height)
+            x2 = x1 + width
+            y2 = y1 + height
+            new_rect = Rectangle(x1, y1, x2, y2)
+            if not any(rect.intersects(new_rect) for rect in rectangles):
+                rectangles.append(new_rect)
+                break
+    return rectangles
 
 
-        for i in range(len(rect)):
-            xb = rect[i][0]
-            yb = rect[i][1]
-            xt = rect[i][2]
-            yt = rect[i][3]
-        
-            x1 = np.array([xb,xt,xt,xb,xb])
-            y1 = np.array([yb,yb,yt,yt,yb])
+def plot_rectangles(rectangles):
+    fig, ax = plt.subplots()
+    for rect in rectangles:
+        x = [rect.x1, rect.x2, rect.x2, rect.x1, rect.x1]
+        y = [rect.y1, rect.y1, rect.y2, rect.y2, rect.y1]
+        ax.plot(x, y, 'b-')
+    ax.set_xlabel('X')
+    ax.set_ylabel('Y')
+    ax.set_title('Input Rectangles')
+    plt.show()
 
 
+def main():
+    num_rectangles = 5
+    x_range = (0, 15)
+    y_range = (0, 15)
+
+    rectangles = generate_rectangles(num_rectangles, x_range, y_range)
+    print(rectangles)
+    #plot_rectangles(rectangles)
+
+    # Solve vertical adjacencies using line sweep algorithm
+    line_sweep_results = lineSweepSolveVertAdjacencies(rectangles)
+
+    print("Line Sweep Results:")
+    for result in line_sweep_results:
+        print(result)
 
 
-# Choose a random rectange and split it into 4 rectangles
-for i in range(2500):
-    
-
-    thisRect = random.randint(0,len(rect)-1)
-
-
-
-    new = rect.pop(thisRect)
-
-
-    xb = new[0]
-    yb = new[1]
-    xt = new[2]
-    yt = new[3]
-
-    if ((xt - xb) > 1000) and ((yt - yb) > 1000):
-      
-
-        midx = int((xt - xb)/2) + xb
-        midy = int((yt - yb)/2) + yb
-        rx = random.randint(midx-200,midx+200)
-        ry = random.randint(midy-200,midy+200)
-
-   
-
-        rect.append([xb,yb,rx,ry])
-        rect.append([xb,ry,rx,yt])
-        rect.append([rx,yb,xt,ry])
-        rect.append([rx,ry,xt,yt])
-    else:
-        rect.append(new)
-
-
-
-
-
-#Main 
-
-beginTime = time.time() #Starting timer
-bruteForceSolveVertAdjacencies(rect)
-endTime = time.time() #Stopping timer
-time_taken_ms=(endTime - beginTime)*1000 #Time taken is converted to ms
-print(len(rect),time_taken_ms) #This is used to print out the number of rectangles taken as input by the function written above as well as the time it took to run.
-    
-     
-
-
-
+if __name__ == "__main__":
+    main()
